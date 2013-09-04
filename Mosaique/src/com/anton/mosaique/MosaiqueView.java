@@ -7,106 +7,121 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
-import android.graphics.Paint;
-import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
-import android.util.Log;
+import android.util.Pair;
 import android.view.View;
 
-public class MosaiqueView extends View {
+import com.anton.mosaique.asynctask.MosaiqueBitmapLoader;
+import com.anton.mosaique.asynctask.MosaiqueBitmapLoader.OnBitmapComputedListener;
 
-	private static final int MAX_IMAGE_DISPLAYED = 21;
-	private static final int MAX_COL = 8;
-	private static final int MAX_ROW = 5;
+public class MosaiqueView extends View implements OnBitmapComputedListener {
 
-	private static final int[] arrayX = { 0, 4, 6, 4, 6, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7 };
-	private static final int[] arrayY = { 0, 0, 0, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4 };
+    private static final int     MAX_IMAGE_DISPLAYED = 21;
+    private static final int     MAX_COL             = 8;
+    private static final int     MAX_ROW             = 6;
 
-	private List<Integer> mListId;
-	private Bitmap[] mBitmaps;
-	private int mColWidth, mRowHeight;
-	private int width, height;
+    private static final int[]   arrayX              = { 0, 4, 6, 4, 6, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7 };
+    private static final int[]   arrayY              = { 0, 0, 0, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5 };
 
-	public MosaiqueView(Context context, AttributeSet attrs) {
-		super(context, attrs);
+    private List<String>         mListId;
+    private List<Bitmap>         mBitmaps;
+    private int                  mColWidth, mRowHeight;
+    private int                  width, height;
+    private MosaiqueBitmapLoader mAsyncLoader;
 
-		mBitmaps = new Bitmap[MAX_IMAGE_DISPLAYED];
+    public MosaiqueView(Context context, AttributeSet attrs) {
+        super(context, attrs);
 
-		if (isInEditMode()) {
-			List<Integer> list = new ArrayList<Integer>();
-			list.add(R.drawable.ic_launcher);
-			list.add(R.drawable.ic_launcher);
-			list.add(R.drawable.ic_launcher);
-			list.add(R.drawable.ic_launcher);
-			list.add(R.drawable.ic_launcher);
-			list.add(R.drawable.ic_launcher);
-			list.add(R.drawable.ic_launcher);
-			list.add(R.drawable.ic_launcher);
-			list.add(R.drawable.ic_launcher);
-			list.add(R.drawable.ic_launcher);
-			list.add(R.drawable.ic_launcher);
-			list.add(R.drawable.ic_launcher);
-			list.add(R.drawable.ic_launcher);
-			list.add(R.drawable.ic_launcher);
-			list.add(R.drawable.ic_launcher);
-			list.add(R.drawable.ic_launcher);
-			list.add(R.drawable.ic_launcher);
-			list.add(R.drawable.ic_launcher);
-			list.add(R.drawable.ic_launcher);
-			list.add(R.drawable.ic_launcher);
-			list.add(R.drawable.ic_launcher);
-			init(list);
-		}
+        mBitmaps = new ArrayList<Bitmap>(MAX_IMAGE_DISPLAYED);
+        for (int i = 0; i < MAX_IMAGE_DISPLAYED; ++i) {
+            mBitmaps.add(null);
+        }
 
-	}
+        if (isInEditMode()) {
+        }
 
-	public void init(List<Integer> list) {
-		mListId = list;
-		loadBitmaps();
-	}
+    }
 
-	@Override
-	protected void onSizeChanged(int w, int h, int oldw, int oldh) {
-		super.onSizeChanged(w, h, oldw, oldh);
-		width = w;
-		height = h;
-		mColWidth = width / MAX_COL;
-		mRowHeight = height / MAX_ROW;
-	}
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        width = w;
+        height = h;
+        mColWidth = width / MAX_COL;
+        mRowHeight = height / MAX_ROW;
+        init(mListId);
+    }
 
-	private void loadBitmaps() {
+    public void init(List<String> list) {
+        mListId = list;
+        loadBitmaps();
+    }
 
-		for (int i = 0; i < MAX_IMAGE_DISPLAYED; ++i) {
-			if (mBitmaps[i] != null) {
-				mBitmaps[i].recycle();
-				mBitmaps[i] = null;
-			}
-			if (mListId != null && i < mListId.size()) {
-				int w, h;
-				if (i == 1) {
-					w = 4 * mColWidth;
-					h = 4 * mRowHeight;
-				} else if (i == 1) {
-					w = 2 * mColWidth;
-					h = 2 * mRowHeight;
-				} else {
-					w = mColWidth;
-					h = mRowHeight;
-				}
-				mBitmaps[i] = BitmapFactory.decodeResource(getResources(), mListId.get(i), null);
-			}
-		}
-	}
+    private void loadBitmaps() {
 
-	@Override
-	public void draw(Canvas canvas) {
-		Drawable back = getBackground();
-		back.draw(canvas);
-		for (int i = 0; i < MAX_IMAGE_DISPLAYED; ++i) {
-			if (mBitmaps[i] != null) {
-				canvas.drawBitmap(mBitmaps[i], arrayX[i] * mColWidth, arrayY[i] * mRowHeight, null);
-			}
-		}
-	}
+        for (Bitmap b : mBitmaps) {
+            if (b != null) {
+                b.recycle();
+            }
+        }
+        if (mAsyncLoader != null) {
+            mAsyncLoader.cancel(true);
+        }
+        mAsyncLoader = new MosaiqueBitmapLoader(mColWidth, mRowHeight, MAX_IMAGE_DISPLAYED, MAX_COL, MAX_ROW);
+        String tabString[] = new String[mListId.size()];
+        for (int i = 0; i < tabString.length; ++i) {
+            tabString[i] = mListId.get(i);
+        }
+        // mBitmaps.clear();
+        mAsyncLoader.setOnProgressListener(this);
+        mAsyncLoader.execute(tabString);
+    }
+
+    @Override
+    public void draw(Canvas canvas) {
+        Drawable back = getBackground();
+        if (back != null) {
+            back.draw(canvas);
+        }
+        for (int i = 0; i < mBitmaps.size() && i < MAX_IMAGE_DISPLAYED; ++i) {
+            if (mBitmaps.get(i) != null && !mBitmaps.get(i).isRecycled()) {
+                canvas.drawBitmap(mBitmaps.get(i), arrayX[i] * mColWidth, arrayY[i] * mRowHeight, null);
+            }
+        }
+    }
+
+    public static int computeOptimalSampleSize(String url, int requestedHeight, int requestedWidth) {
+
+        BitmapFactory.Options options = new BitmapFactory.Options();
+
+        // This allow to decode only the bounds : the method will return only bitmap's height and width
+        // in the options object (so the method returns null as result).
+        options.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(url, options);
+
+        int height = options.outHeight;
+        int width = options.outWidth;
+        int inSampleSize = 1;
+
+        // Now that we have the bitmap bounds, we can compare it to the requested bounds, and decide
+        // how much we should decrease the image size. All this process is done to reduce memory heap use and
+        // avoid unexpected OutOfMemoryError while handling bitmaps.
+        if (height > requestedHeight || width > requestedWidth) {
+
+            int heightRatio = Math.round((float) height / (float) requestedHeight);
+            int widthRatio = Math.round((float) width / (float) requestedWidth);
+
+            inSampleSize = heightRatio < widthRatio ? heightRatio : widthRatio;
+
+        }
+        return inSampleSize;
+    }
+
+    @Override
+    public void onBitmapComputed(Pair<Bitmap, Integer> pair) {
+        mBitmaps.set(pair.second, pair.first);
+        invalidate();
+
+    }
 }

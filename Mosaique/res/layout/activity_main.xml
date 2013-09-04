@@ -10,8 +10,7 @@
 
     <com.anton.mosaique.MosaiqueView
         android:id="@+id/mosaique"
-        android:layout_width="300dip"
-        android:layout_height="300dip"
-        android:background="#000000" />
+        android:layout_width="320dip"
+        android:layout_height="190dip"/>
 
 </RelativeLayout>
